@@ -11,6 +11,7 @@ const App = ()=> {
   const [products, setProducts] = useState([]);
   const [orders, setOrders] = useState([]);
   const [lineItems, setLineItems] = useState([]);
+  const [favorites, setFavorites] = useState([]);
   const [auth, setAuth] = useState({});
 
   const getHeaders = ()=> {
@@ -61,6 +62,16 @@ const App = ()=> {
   useEffect(()=> {
     if(auth.id){
       const fetchData = async()=> {
+        const response = await axios.get('/api/favorites', getHeaders());
+        setFavorites(response.data);
+      };
+      fetchData();
+    }
+  }, [auth]);
+
+  useEffect(()=> {
+    if(auth.id){
+      const fetchData = async()=> {
         const response = await axios.get('/api/lineItems', getHeaders());
         setLineItems(response.data);
       };
@@ -96,6 +107,16 @@ const App = ()=> {
     setLineItems(lineItems.filter( _lineItem => _lineItem.id !== lineItem.id));
   };
 
+  const createFavorite = async(favorite)=> {
+    const response = await axios.post('/api/favorites', favorite, getHeaders());
+    setFavorites([ ...favorites, response.data ]);
+  };
+  
+  const removeFavorite = async(favorite)=> {
+    await axios.delete(`/api/favorites/${favorite.id}`, getHeaders());
+    setFavorites(favorites.filter(_favorite => _favorite.id !== favorite.id));
+  };
+
   const cart = orders.find(order => order.is_cart) || {};
 
   const cartItems = lineItems.filter(lineItem => lineItem.order_id === cart.id);
@@ -115,6 +136,8 @@ const App = ()=> {
     window.localStorage.removeItem('token');
     setAuth({});
   }
+
+  console.log(favorites);
 
   return (
     <div>
@@ -137,6 +160,9 @@ const App = ()=> {
                 cartItems = { cartItems }
                 createLineItem = { createLineItem }
                 updateLineItem = { updateLineItem }
+                favorites = { favorites }
+                createFavorite={ createFavorite }
+                removeFavorite={ removeFavorite }
               />
               <Cart
                 cart = { cart }
@@ -161,6 +187,9 @@ const App = ()=> {
               createLineItem = { createLineItem }
               updateLineItem = { updateLineItem }
               auth = { auth }
+              favorites = { favorites }
+              createFavorite={ createFavorite }
+              removeFavorite={ removeFavorite }
             />
           </div>
         )

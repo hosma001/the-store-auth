@@ -92,9 +92,10 @@ const createUser = async(user)=> {
 
 const createProduct = async(product)=> {
   const SQL = `
-    INSERT INTO products (id, name) VALUES($1, $2) RETURNING *
+    INSERT INTO products (id, name, out_of_stock) VALUES($1, $2, $3) RETURNING *
   `;
-  const response = await client.query(SQL, [ uuidv4(), product.name]);
+  const response = await client.query(SQL, [ uuidv4(), product.name, product.out_of_stock ]);
+  console.log(response);
   return response.rows[0];
 };
 
@@ -143,6 +144,14 @@ const createLineItem = async(lineItem)=> {
   return response.rows[0];
 };
 
+const createFavorite = async(favorite)=> {
+  const SQL = `
+  INSERT INTO favorites (product_id, user_id, id) VALUES($1, $2, $3) RETURNING *
+`;
+ response = await client.query(SQL, [ favorite.product_id, favorite.user_id, uuidv4()]);
+  return response.rows[0];
+};
+
 const deleteLineItem = async(lineItem)=> {
   await ensureCart(lineItem);
   const SQL = `
@@ -150,6 +159,14 @@ const deleteLineItem = async(lineItem)=> {
     WHERE id = $1
   `;
   await client.query(SQL, [lineItem.id]);
+};
+
+const deleteFavorite = async(favorite)=> {
+  const SQL = `
+    DELETE from favorites
+    WHERE id = $1 AND user_id = $2
+  `;
+  await client.query(SQL, [favorite.id, favorite.user_id]);
 };
 
 const updateOrder = async(order)=> {
@@ -180,8 +197,18 @@ const fetchOrders = async(userId)=> {
   return response.rows;
 };
 
+const fetchFavorites = async(userId)=> {
+  const SQL = `
+    SELECT * FROM favorites
+    WHERE user_id = $1
+  `;
+  const response = await client.query(SQL, [ userId ]);
+  return response.rows;
+};
+
 const seed = async()=> {
   const SQL = `
+    DROP TABLE IF EXISTS favorites;
     DROP TABLE IF EXISTS line_items;
     DROP TABLE IF EXISTS products;
     DROP TABLE IF EXISTS orders;
@@ -198,7 +225,8 @@ const seed = async()=> {
     CREATE TABLE products(
       id UUID PRIMARY KEY,
       created_at TIMESTAMP DEFAULT now(),
-      name VARCHAR(100) UNIQUE NOT NULL
+      name VARCHAR(100) UNIQUE NOT NULL,
+      out_of_stock BOOLEAN DEFAULT false NOT NULL
     );
 
     CREATE TABLE orders(
@@ -217,6 +245,14 @@ const seed = async()=> {
       CONSTRAINT product_and_order_key UNIQUE(product_id, order_id)
     );
 
+    CREATE TABLE favorites(
+      id UUID PRIMARY KEY,
+      created_at TIMESTAMP DEFAULT now(),
+      product_id UUID REFERENCES products(id) NOT NULL,
+      user_id UUID REFERENCES users(id) NOT NULL,
+      CONSTRAINT product_and_user_key UNIQUE(product_id, user_id)
+    );
+
   `;
   await client.query(SQL);
 
@@ -227,10 +263,15 @@ const seed = async()=> {
     createUser({ username: 'batman', password: 'im_batman', is_admin: false})
   ]);
   const [foo, bar, bazz] = await Promise.all([
-    createProduct({ name: 'foo' }),
-    createProduct({ name: 'bar' }),
-    createProduct({ name: 'bazz' }),
-    createProduct({ name: 'quq' }),
+    createProduct({ name: 'foo', out_of_stock: 'true'}),
+    createProduct({ name: 'bar', out_of_stock: 'false' }),
+    createProduct({ name: 'bazz', out_of_stock: 'false' }),
+    createProduct({ name: 'quq', out_of_stock: 'false' }),
+  ]);
+  await Promise.all([
+    createFavorite({ user_id: ethyl.id, product_id: foo.id }),
+    createFavorite({ user_id: ethyl.id, product_id: bar.id }),
+    createFavorite({ user_id: moe.id, product_id: foo.id })
   ]);
   let orders = await fetchOrders(ethyl.id);
   let cart = orders.find(order => order.is_cart);
@@ -244,11 +285,14 @@ const seed = async()=> {
 
 module.exports = {
   fetchProducts,
+  fetchFavorites,
   fetchOrders,
   fetchLineItems,
   createLineItem,
+  createFavorite,
   updateLineItem,
   deleteLineItem,
+  deleteFavorite,
   updateOrder,
   authenticate,
   findUserByToken,

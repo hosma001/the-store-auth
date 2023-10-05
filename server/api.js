@@ -1,10 +1,13 @@
 const {
   fetchProducts,
+  fetchFavorites,
   fetchOrders,
   fetchLineItems,
   createLineItem,
+  createFavorite,
   updateLineItem,
   deleteLineItem,
+  deleteFavorite,
   updateOrder,
   authenticate,
   findUserByToken
@@ -45,7 +48,6 @@ app.post('/login', async(req, res, next)=> {
   }
 });
 
-
 app.get('/me', isLoggedIn, (req, res, next)=> {
   try {
     res.send(req.user);
@@ -77,6 +79,34 @@ app.put('/orders/:id', isLoggedIn, async(req, res, next)=> {
 app.get('/orders', isLoggedIn, async(req, res, next)=> {
   try {
     res.send(await fetchOrders(req.user.id));
+  }
+  catch(ex){
+    next(ex);
+  }
+});
+
+app.get('/favorites', isLoggedIn, async(req, res, next)=> {
+  try {
+    res.send(await fetchFavorites(req.user.id));
+  }
+  catch(ex){
+    next(ex);
+  }
+});
+
+app.post('/favorites', isLoggedIn, async(req, res, next)=> {
+  try {
+    res.send(await createFavorite({user_id: req.user.id, product_id: req.body.product_id}));
+  }
+  catch(ex){
+    next(ex);
+  }
+});
+
+app.delete('/favorites/:id', isLoggedIn, async(req, res, next)=> {
+  try {
+    await deleteFavorite({ id: req.params.id, user_id: req.user.id });
+    res.sendStatus(201);
   }
   catch(ex){
     next(ex);
