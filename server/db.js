@@ -24,8 +24,9 @@ const fetchLineItems = async(userId)=> {
 
 const fetchProducts = async()=> {
   const SQL = `
-    SELECT *
+    SELECT *, out_of_stock
     FROM products
+    ORDER BY name
   `;
   const response = await client.query(SQL);
   return response.rows;
@@ -95,7 +96,6 @@ const createProduct = async(product)=> {
     INSERT INTO products (id, name, out_of_stock) VALUES($1, $2, $3) RETURNING *
   `;
   const response = await client.query(SQL, [ uuidv4(), product.name, product.out_of_stock ]);
-  console.log(response);
   return response.rows[0];
 };
 
@@ -135,12 +135,26 @@ const updateLineItem = async(lineItem)=> {
   return response.rows[0];
 };
 
+const fetchProductById = async(productId)=> {
+  const SQL = `
+    SELECT * FROM products WHERE id = $1;
+  `;
+  const response = await client.query(SQL, [productId]);
+  return response.rows[0];
+};
+
 const createLineItem = async(lineItem)=> {
+  const product = await fetchProductById(lineItem.product_id);
+  
+  if (product.out_of_stock) {
+    throw Error('Product is out of stock');
+  }
+
   await ensureCart(lineItem);
   const SQL = `
   INSERT INTO line_items (product_id, order_id, id) VALUES($1, $2, $3) RETURNING *
-`;
- response = await client.query(SQL, [ lineItem.product_id, lineItem.order_id, uuidv4()]);
+  `;
+  response = await client.query(SQL, [ lineItem.product_id, lineItem.order_id, uuidv4()]);
   return response.rows[0];
 };
 
@@ -148,7 +162,7 @@ const createFavorite = async(favorite)=> {
   const SQL = `
   INSERT INTO favorites (product_id, user_id, id) VALUES($1, $2, $3) RETURNING *
 `;
- response = await client.query(SQL, [ favorite.product_id, favorite.user_id, uuidv4()]);
+  response = await client.query(SQL, [ favorite.product_id, favorite.user_id, uuidv4()]);
   return response.rows[0];
 };
 
@@ -260,7 +274,7 @@ const seed = async()=> {
     createUser({ username: 'moe', password: 'm_password', is_admin: false}),
     createUser({ username: 'lucy', password: 'l_password', is_admin: false}),
     createUser({ username: 'ethyl', password: '1234', is_admin: true}),
-    createUser({ username: 'batman', password: 'im_batman', is_admin: false})
+    createUser({ username: 'batman', password: 'im_batman', is_admin: true})
   ]);
   const [foo, bar, bazz] = await Promise.all([
     createProduct({ name: 'foo', out_of_stock: 'true'}),
@@ -285,6 +299,7 @@ const seed = async()=> {
 
 module.exports = {
   fetchProducts,
+  fetchProductById,
   fetchFavorites,
   fetchOrders,
   fetchLineItems,

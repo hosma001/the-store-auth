@@ -137,8 +137,6 @@ const App = ()=> {
     setAuth({});
   }
 
-  console.log(favorites);
-
   return (
     <div>
       {
